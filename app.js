@@ -248,6 +248,24 @@
     loadMyResults();
   });
 
+  $("pw-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const current = $("pw-current").value, next = $("pw-new").value, again = $("pw-confirm").value;
+    if (next.length < 8) return message("pw-message", "Le nouveau mot de passe doit contenir au moins 8 caractères.");
+    if (next !== again) return message("pw-message", "Les deux mots de passe ne correspondent pas.");
+    if (next === current) return message("pw-message", "Le nouveau mot de passe doit être différent de l'ancien.");
+    message("pw-message", "Modification en cours…", false);
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const email = session && session.user && session.user.email;
+    if (!email) return message("pw-message", "Votre session a expiré. Reconnectez-vous.");
+    const check = await supabaseClient.auth.signInWithPassword({ email, password: current });
+    if (check.error) return message("pw-message", "Mot de passe actuel incorrect.");
+    const { error } = await supabaseClient.auth.updateUser({ password: next });
+    if (error) return message("pw-message", "Modification impossible : " + error.message);
+    $("pw-form").reset();
+    message("pw-message", "Mot de passe modifié.", false);
+  });
+
   async function init() {
     if (!configured || !window.supabase) {
       $("auth-message").textContent = "Configuration requise : renseignez config.js puis déployez les fonctions Supabase.";
