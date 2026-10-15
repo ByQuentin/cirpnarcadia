@@ -147,10 +147,11 @@
         events: eventQueue
       });
       stopTimer();
+      const finishedId = currentAttempt.id;
       currentAttempt = null;
       $("exam-view").classList.add("hidden");
       $("exam-finished").classList.remove("hidden");
-      $("finish-warning").textContent = localExitCount >= 3 ? `⚠ Une suspicion de triche a été détectée pendant votre examen (${localExitCount} sorties de la page). Cette information est transmise au recruteur.` : "";
+      showFinishWarning(finishedId, localExitCount);
       $("finish-summary").textContent = `Examen transmis · Réponses traitées : ${result.answeredCount}/${questions.length}.`;
     } catch (error) {
       message("exam-message", error.message || "La transmission a échoué. Vérifiez votre connexion et réessayez.");
@@ -178,7 +179,13 @@
     }
   }
 
-  async function flushEvents() {
+  let flushChain = Promise.resolve();
+  function flushEvents() {
+    // Un seul envoi à la fois : évite que les mêmes sorties soient comptées deux fois par le serveur.
+    flushChain = flushChain.then(doFlush, doFlush);
+    return flushChain;
+  }
+  async function doFlush() {
     if (!currentAttempt || !eventQueue.length) return;
     const batch = eventQueue.slice();
     await callFunction("super-service", { attemptId: currentAttempt.id, events: batch, eventsOnly: true });
@@ -265,6 +272,17 @@
     $("pw-form").reset();
     message("pw-message", "Mot de passe modifié.", false);
   });
+
+  async function showFinishWarning(attemptId, localCount) {
+    const warn = $("finish-warning");
+    const text = (n) => `⚠ ATTENTION : une suspicion de triche a été détectée pendant votre examen (${n} sorties de la page). Une vérification par un recruteur est nécessaire.`;
+    warn.textContent = localCount >= 3 ? text(localCount) : "";
+    try {
+      const { data } = await supabaseClient.rpc("my_results");
+      const r = (data || []).find((x) => x.attempt_id === attemptId);
+      if (r && (r.flagged_for_review || r.review_status === "pending")) warn.textContent = text(r.suspicious_exit_count || localCount);
+    } catch (_) { /* l'alerte locale reste affichée */ }
+  }
 
   async function init() {
     if (!configured || !window.supabase) {
