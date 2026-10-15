@@ -27,7 +27,7 @@ const actions0=a=>{const d=`<button class="button quiet" data-act="detail" data-
  if(a.status==="in_progress")return d+` <button class="button quiet" data-act="cancel" data-id="${a.id}">Annuler</button>`;
  if(a.review_status==="pending")return`<button class="button primary" data-act="detail" data-id="${a.id}">Débloquer</button>`;
  if(a.passed===false||a.review_status==="refused")return d+(a.unlocked?' <span class="tag ok">Nouvelle tentative autorisée</span>':` <button class="button quiet" data-act="unlock" data-id="${a.id}">Autoriser à repasser</button>`);
- return d};
+ return d+(me.role==="admin"&&a.candidate_id!==me.id&&a.passed===true&&a.review_status!=="pending"?` <button class="button quiet" data-act="removepass" data-id="${a.id}">Retirer la réussite</button>`:"")};
 const sb=supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey),$=i=>document.getElementById(i);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let me,exam,qs=[],cur="exams";
@@ -107,6 +107,9 @@ document.addEventListener("click",async ev=>{const b=ev.target.closest("[data-ac
   const{data:d,error}=await sb.from("exam_attempts").update({review_status:ok?"validated":"refused",reviewed_by:me.id,reviewed_at:new Date().toISOString()}).eq("id",id).select("id");
   if(!error&&!d?.length)return say(DENIED);
   return error?say(error.message):(say(ok?"Examen validé.":"Examen refusé.",1),loadResults())}
+ if(a==="removepass"){if(!confirm("Retirer cette réussite ? La tentative et ses réponses seront supprimées définitivement, et le candidat pourra repasser l'examen."))return;
+  const{data:d,error}=await sb.from("exam_attempts").delete().eq("id",id).select("id");if(error)return say(error.message);if(!d?.length)return say("Action refusée : réservée aux administrateurs.");
+  say("Réussite retirée : le candidat peut repasser l'examen.",1);return loadResults()}
  if(a==="unlock"){const{data:d,error}=await sb.from("exam_attempts").update({unlocked:true}).eq("id",id).select("id");if(error)return say(error.message);if(!d?.length)return say(DENIED);return loadResults()}
  if(a==="cancel"){if(!confirm("Annuler cette tentative en cours ?"))return;const{data:d,error}=await sb.from("exam_attempts").update({status:"cancelled"}).eq("id",id).select("id");if(error)return say(error.message);if(!d?.length)return say(DENIED);return loadResults()}
  if(a==="deluser"){if(!confirm(`Supprimer définitivement le compte ${b.dataset.mail} et tous ses résultats ?`))return;
