@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Portail de sélection — Police RP">
-  <title>CIR | Police NATIONALE</title>
+  <title>Centre de sélection | Police RP</title>
   <link rel="stylesheet" href="styles.css">
-</head> 
+</head>
 <body>
   <header class="topbar">
     <div class="brand-mark" aria-hidden="true">PN</div>
@@ -48,7 +48,9 @@
       </div>
       <div id="candidate-home">
         <p class="muted">Aucun examen n'est lancé automatiquement. Lorsque votre recruteur vous aura communiqué une session, vous pourrez la démarrer ici.</p>
-        <label for="exam-code">Code de session</label>
+        <h3 style="margin:20px 0 6px">Mes examens</h3>
+        <div id="my-results" class="muted small">Chargement…</div>
+        <label for="exam-code" style="margin-top:20px;display:block">Code de l'examen suivant</label>
         <input id="exam-code" autocomplete="off" placeholder="Ex. SEL-2026-001">
         <button class="button primary" id="start-button" type="button">Démarrer l'examen</button>
         <p class="form-message" id="start-message" role="status"></p>
@@ -68,8 +70,9 @@
       </div>
       <div id="exam-finished" class="hidden">
         <h3>Examen transmis</h3>
-        <p class="muted">Votre session est terminée. Le résultat sera consultable par l'équipe de recrutement selon les règles du serveur.</p>
+        <p class="muted">Votre session est terminée. Votre résultat apparaît dans « Mes examens ».</p>
         <p id="finish-summary"></p>
+        <button class="button primary" id="back-home" type="button">Retour à mon espace</button>
       </div>
     </section>
 

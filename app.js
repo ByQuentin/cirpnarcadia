@@ -25,7 +25,7 @@
   function setAuthenticated(user) {
     $("auth-panel").classList.toggle("hidden", !!user);
     $("candidate-panel").classList.toggle("hidden", !user);
-    if (user) $("candidate-heading").textContent = "Votre espace de sélection";
+    if (user) { $("candidate-heading").textContent = "Votre espace de sélection"; loadMyResults(); }
   }
 
   async function callFunction(name, payload) {
@@ -207,6 +207,44 @@
       event.preventDefault();
       event.returnValue = "";
     }
+  });
+
+  function statusOf(r) {
+    if (r.status === "in_progress") return { text: "En cours", cls: "" };
+    if (r.unlocked) return { text: "Nouvelle tentative autorisée", cls: "" };
+    if (r.review_status === "pending") return { text: "En attente de vérification par un recruteur", cls: "warn" };
+    if (r.review_status === "refused") return { text: "Refusé — nouvelle tentative uniquement sur autorisation d'un recruteur", cls: "bad" };
+    return r.passed ? { text: "Réussi", cls: "ok" }
+      : { text: "Échoué — nouvelle tentative uniquement sur autorisation d'un recruteur", cls: "bad" };
+  }
+  async function loadMyResults() {
+    const box = $("my-results");
+    if (!box || !supabaseClient) return;
+    const { data, error } = await supabaseClient.rpc("my_results");
+    if (error) { box.textContent = ""; return; }
+    const latest = new Map();
+    (data || []).forEach((r) => { if (!latest.has(r.exam_id)) latest.set(r.exam_id, r); });
+    box.replaceChildren();
+    if (!latest.size) { box.textContent = "Aucun examen passé pour le moment."; return; }
+    latest.forEach((r) => {
+      const row = document.createElement("div");
+      row.className = "result-row";
+      const name = document.createElement("strong");
+      name.textContent = r.exam_title;
+      const s = statusOf(r);
+      const tag = document.createElement("span");
+      tag.className = `tag ${s.cls}`;
+      tag.textContent = s.text;
+      row.append(name, tag);
+      box.append(row);
+    });
+  }
+  $("back-home").addEventListener("click", () => {
+    $("exam-finished").classList.add("hidden");
+    $("candidate-home").classList.remove("hidden");
+    $("exam-code").value = "";
+    message("start-message", "", false);
+    loadMyResults();
   });
 
   async function init() {

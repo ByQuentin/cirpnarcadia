@@ -28,3 +28,6 @@ form .button{margin-top:12px}.form-message{font-size:13px;min-height:18px;color:
 .notice{background:var(--warning);border:1px solid #f0d9ad;border-radius:12px;padding:17px 19px;font-size:13px}.notice p{margin:6px 0 0;color:#65502d}
 footer{text-align:center;color:#7a8494;font-size:11px;margin:28px 0 12px}
 @media(max-width:520px){.topbar a{margin-left:auto}.page-shell{margin:28px auto}.environment{display:none}.panel-heading{align-items:flex-start}.exam-actions .button{flex:1}}
+
+.result-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.tag{padding:2px 10px;border-radius:20px;background:#edf1f6;font-size:12px;font-weight:600}.tag.ok{background:#e3f6ec;color:#18794e}.tag.bad{background:#fde7e9;color:#a9232f}.tag.warn{background:var(--warning);color:#8a5a00}
