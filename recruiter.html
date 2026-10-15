@@ -20,8 +20,10 @@
 <script>
 const cfg=window.POLICE_RP_CONFIG,FN_CREATE_USER="clever-action";
 const outcome=a=>a.review_status==="pending"?["À vérifier","warn"]:a.review_status==="refused"?["Refusé","bad"]:a.passed?["Réussi","ok"]:["Échec","bad"];
+const DENIED="Action refusée : vous ne pouvez pas corriger votre propre examen.";
 const tagOf=a=>{const[t,c]=outcome(a);return`<span class="tag ${c}">${t}</span>`};
-const actions=a=>{const d=`<button class="button quiet" data-act="detail" data-id="${a.id}">Détail</button>`;
+const actions=a=>a.candidate_id===me.id&&(a.status==="in_progress"||a.review_status==="pending"||a.passed===false||a.review_status==="refused")?`<button class="button quiet" data-act="detail" data-id="${a.id}">Détail</button> <span class="tag warn">Votre tentative : correction par un autre membre</span>`:actions0(a);
+const actions0=a=>{const d=`<button class="button quiet" data-act="detail" data-id="${a.id}">Détail</button>`;
  if(a.status==="in_progress")return d+` <button class="button quiet" data-act="cancel" data-id="${a.id}">Annuler</button>`;
  if(a.review_status==="pending")return`<button class="button primary" data-act="detail" data-id="${a.id}">Débloquer</button>`;
  if(a.passed===false||a.review_status==="refused")return d+(a.unlocked?' <span class="tag ok">Nouvelle tentative autorisée</span>':` <button class="button quiet" data-act="unlock" data-id="${a.id}">Autoriser à repasser</button>`);
@@ -63,11 +65,11 @@ async function addQuestion(){const prompt=val("qp"),opts=[...document.querySelec
  const{error:e3}=gid?await sb.from("answer_keys").insert({question_id:q.id,correct_option_id:gid}):{error:e2||{message:"Erreur"}};
  if(e2||e3){await sb.from("questions").delete().eq("id",q.id);return say((e2||e3).message)}
  say("Question ajoutée.",1);openExam(exam.id)}
-async function loadResults(){const{data,error}=await sb.from("exam_attempts").select("id,status,score,total_questions,passed,suspicious_exit_count,flagged_for_review,unlocked,review_status,started_at,profiles!candidate_id(display_name,email),exams(code)").order("started_at",{ascending:false}).limit(200);
+async function loadResults(){const{data,error}=await sb.from("exam_attempts").select("id,candidate_id,status,score,total_questions,passed,suspicious_exit_count,flagged_for_review,unlocked,review_status,started_at,profiles!candidate_id(display_name,email),exams(code)").order("started_at",{ascending:false}).limit(200);
  if(error)return say(error.message);const only=$("flt")?.checked;
  $("view").innerHTML=`<h2>Résultats</h2><label style="display:flex;gap:8px;align-items:center"><input id="flt" type="checkbox" style="width:auto" ${only?"checked":""} data-act="refresh"> Signalés uniquement</label><div class="wrap"><table><tr><th>Candidat</th><th>Examen</th><th>Date</th><th>État</th><th>Score</th><th>Sorties</th><th></th></tr>${data.filter(a=>!only||a.flagged_for_review).map(a=>`<tr><td>${esc(a.profiles?.display_name||"")}<br><small>${esc(a.profiles?.email||"")}</small></td><td>${esc(a.exams?.code)}</td><td>${new Date(a.started_at).toLocaleString("fr-FR")}</td><td>${a.status}</td><td>${a.score==null?"—":`${a.score}/${a.total_questions} ${tagOf(a)}`}</td><td>${a.suspicious_exit_count} ${a.flagged_for_review?'<span class="tag bad">à vérifier</span>':""}</td><td>${actions(a)}</td></tr>`).join("")}</table></div>`}
 async function showDetail(id){
- const{data:a,error}=await sb.from("exam_attempts").select("question_order,score,total_questions,passed,status,review_status,profiles!candidate_id(display_name,email)").eq("id",id).single();if(error)return say(error.message);
+ const{data:a,error}=await sb.from("exam_attempts").select("question_order,candidate_id,score,total_questions,passed,status,review_status,profiles!candidate_id(display_name,email)").eq("id",id).single();if(error)return say(error.message);
  const ord=a.question_order||[];
  const[{data:ans},{data:qq},{data:oo},{data:kk},{data:ev}]=await Promise.all([
   sb.from("attempt_answers").select("question_id,selected_option_id,is_correct").eq("attempt_id",id),
@@ -78,7 +80,7 @@ async function showDetail(id){
  const m=(l,k,v)=>Object.fromEntries((l||[]).map(x=>[x[k],v?x[v]:x])),P=m(qq,"id","prompt"),O=m(oo,"id","option_text"),K=m(kk,"question_id","correct_option_id"),A=m(ans,"question_id");
  $("view").innerHTML=`<button class="button quiet" data-tab="results">← Résultats</button><h2 style="margin-top:12px">${esc(a.profiles?.display_name||"")} <small>${esc(a.profiles?.email||"")}</small></h2>
  <p>${a.score==null?"Examen non terminé":`Score : <strong>${a.score}/${a.total_questions}</strong> ${tagOf(a)}`}</p>
- ${a.review_status==="pending"?`<div class="notice"><strong>Vérification requise</strong> : réussite avec ${ev?.length||0} sortie(s) de page. Consultez le détail ci-dessous, puis décidez.<div class="row" style="margin-top:10px"><button class="button primary" data-act="validate" data-id="${id}">Valider</button><button class="button quiet" data-act="refuse" data-id="${id}">Refuser</button></div></div>`:""}
+ ${a.review_status==="pending"?`<div class="notice"><strong>Vérification requise</strong> : réussite avec ${ev?.length||0} sortie(s) de page. Consultez le détail ci-dessous, puis décidez.${a.candidate_id===me.id?'<p><strong>Vous ne pouvez pas corriger votre propre examen : un autre recruteur ou admin doit le faire.</strong></p>':`<div class="row" style="margin-top:10px"><button class="button primary" data-act="validate" data-id="${id}">Valider</button><button class="button quiet" data-act="refuse" data-id="${id}">Refuser</button></div>`}</div>`:""}
  ${ans?.length?"":'<p class="muted">Aucune réponse enregistrée (examen non terminé ou annulé).</p>'}
  <div class="wrap"><table><tr><th>N°</th><th>Question</th><th>Réponse du candidat</th><th>Bonne réponse</th><th></th></tr>${ord.map((q,i)=>{const r=A[q],ok=r?.is_correct;return`<tr><td>${i+1}</td><td>${esc(P[q])}</td><td>${r?.selected_option_id?esc(O[r.selected_option_id]):"<em>Sans réponse</em>"}</td><td>${esc(O[K[q]])}</td><td>${r?`<span class="tag ${ok?"ok":"bad"}">${ok?"Juste":"Faux"}</span>`:""}</td></tr>`}).join("")}</table></div>
  <h3 style="margin-top:18px">Sorties de page (${ev?.length||0})</h3>${ev?.length?`<ul>${ev.map(x=>`<li>${new Date(x.occurred_at).toLocaleString("fr-FR")}</li>`).join("")}</ul>`:"<p>Aucune.</p>"}`}
@@ -102,10 +104,11 @@ document.addEventListener("click",async ev=>{const b=ev.target.closest("[data-ac
   if(count){const{error:e1}=await sb.from("exam_attempts").delete().eq("exam_id",exam.id);if(e1)return say(e1.message)}
   const{error}=await sb.from("exams").delete().eq("id",exam.id);return error?say(error.message):(say("Examen supprimé.",1),tab("exams"))}
  if(a==="validate"||a==="refuse"){const ok=a==="validate";if(!confirm(ok?"Valider cet examen ?":"Refuser cet examen ? Le candidat ne pourra repasser qu'avec votre autorisation."))return;
-  const{error}=await sb.from("exam_attempts").update({review_status:ok?"validated":"refused",reviewed_by:me.id,reviewed_at:new Date().toISOString()}).eq("id",id);
+  const{data:d,error}=await sb.from("exam_attempts").update({review_status:ok?"validated":"refused",reviewed_by:me.id,reviewed_at:new Date().toISOString()}).eq("id",id).select("id");
+  if(!error&&!d?.length)return say(DENIED);
   return error?say(error.message):(say(ok?"Examen validé.":"Examen refusé.",1),loadResults())}
- if(a==="unlock"){await sb.from("exam_attempts").update({unlocked:true}).eq("id",id);return loadResults()}
- if(a==="cancel"){if(!confirm("Annuler cette tentative en cours ?"))return;await sb.from("exam_attempts").update({status:"cancelled"}).eq("id",id);return loadResults()}
+ if(a==="unlock"){const{data:d,error}=await sb.from("exam_attempts").update({unlocked:true}).eq("id",id).select("id");if(error)return say(error.message);if(!d?.length)return say(DENIED);return loadResults()}
+ if(a==="cancel"){if(!confirm("Annuler cette tentative en cours ?"))return;const{data:d,error}=await sb.from("exam_attempts").update({status:"cancelled"}).eq("id",id).select("id");if(error)return say(error.message);if(!d?.length)return say(DENIED);return loadResults()}
  if(a==="deluser"){if(!confirm(`Supprimer définitivement le compte ${b.dataset.mail} et tous ses résultats ?`))return;
   const{data:{session}}=await sb.auth.getSession();
   const r=await fetch(`${cfg.functionsBaseUrl}/${FN_CREATE_USER}`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`,apikey:cfg.supabaseAnonKey},body:JSON.stringify({action:"delete",userId:id})});
