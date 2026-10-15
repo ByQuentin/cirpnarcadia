@@ -150,6 +150,7 @@
       currentAttempt = null;
       $("exam-view").classList.add("hidden");
       $("exam-finished").classList.remove("hidden");
+      $("finish-warning").textContent = localExitCount >= 3 ? `⚠ Une suspicion de triche a été détectée pendant votre examen (${localExitCount} sorties de la page). Cette information est transmise au recruteur.` : "";
       $("finish-summary").textContent = `Examen transmis · Réponses traitées : ${result.answeredCount}/${questions.length}.`;
     } catch (error) {
       message("exam-message", error.message || "La transmission a échoué. Vérifiez votre connexion et réessayez.");

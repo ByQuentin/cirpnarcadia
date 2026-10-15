@@ -11,7 +11,7 @@
 <form id="lf"><label>E-mail</label><input id="em" type="email" required><label>Mot de passe</label><input id="pw" type="password" required>
 <button class="button primary">Se connecter</button><p class="form-message" id="auth-msg"></p></form></section>
 <div id="app" class="hidden">
-<div class="tabs"><button class="button quiet" data-tab="exams">Examens</button><button class="button quiet" data-tab="results">Résultats</button><button class="button quiet" data-tab="access">Accès</button><button class="button quiet" data-act="logout" style="margin-left:auto">Déconnexion</button></div>
+<div class="tabs"><button class="button quiet" data-tab="exams">Examens</button><button class="button quiet" data-tab="results">Résultats</button><button class="button quiet" data-tab="access">Accès</button><a class="button quiet" href="index.html" style="text-decoration:none;display:inline-flex;align-items:center">Espace candidat</a><button class="button quiet" data-act="logout" style="margin-left:auto">Déconnexion</button></div>
 <p class="form-message" id="msg"></p>
 <section class="panel" id="view"></section></div>
 </main>
@@ -20,6 +20,11 @@
 const cfg=window.POLICE_RP_CONFIG,FN_CREATE_USER="clever-action";
 const outcome=a=>a.review_status==="pending"?["À vérifier","warn"]:a.review_status==="refused"?["Refusé","bad"]:a.passed?["Réussi","ok"]:["Échec","bad"];
 const tagOf=a=>{const[t,c]=outcome(a);return`<span class="tag ${c}">${t}</span>`};
+const actions=a=>{const d=`<button class="button quiet" data-act="detail" data-id="${a.id}">Détail</button>`;
+ if(a.status==="in_progress")return d+` <button class="button quiet" data-act="cancel" data-id="${a.id}">Annuler</button>`;
+ if(a.review_status==="pending")return`<button class="button primary" data-act="detail" data-id="${a.id}">Débloquer</button>`;
+ if(a.passed===false||a.review_status==="refused")return d+(a.unlocked?' <span class="tag ok">Nouvelle tentative autorisée</span>':` <button class="button quiet" data-act="unlock" data-id="${a.id}">Autoriser à repasser</button>`);
+ return d};
 const sb=supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey),$=i=>document.getElementById(i);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let me,exam,qs=[],cur="exams";
@@ -59,7 +64,7 @@ async function addQuestion(){const prompt=val("qp"),opts=[...document.querySelec
  say("Question ajoutée.",1);openExam(exam.id)}
 async function loadResults(){const{data,error}=await sb.from("exam_attempts").select("id,status,score,total_questions,passed,suspicious_exit_count,flagged_for_review,unlocked,review_status,started_at,profiles!candidate_id(display_name,email),exams(code)").order("started_at",{ascending:false}).limit(200);
  if(error)return say(error.message);const only=$("flt")?.checked;
- $("view").innerHTML=`<h2>Résultats</h2><label style="display:flex;gap:8px;align-items:center"><input id="flt" type="checkbox" style="width:auto" ${only?"checked":""} data-act="refresh"> Signalés uniquement</label><div class="wrap"><table><tr><th>Candidat</th><th>Examen</th><th>Date</th><th>État</th><th>Score</th><th>Sorties</th><th></th></tr>${data.filter(a=>!only||a.flagged_for_review).map(a=>`<tr><td>${esc(a.profiles?.display_name||"")}<br><small>${esc(a.profiles?.email||"")}</small></td><td>${esc(a.exams?.code)}</td><td>${new Date(a.started_at).toLocaleString("fr-FR")}</td><td>${a.status}</td><td>${a.score==null?"—":`${a.score}/${a.total_questions} ${tagOf(a)}`}</td><td>${a.suspicious_exit_count} ${a.flagged_for_review?'<span class="tag bad">à vérifier</span>':""}</td><td><button class="button quiet" data-act="detail" data-id="${a.id}">Détail</button> ${a.status==="in_progress"?`<button class="button quiet" data-act="cancel" data-id="${a.id}">Annuler</button>`:a.review_status==="pending"?`<button class="button primary" data-act="validate" data-id="${a.id}">Valider</button> <button class="button quiet" data-act="refuse" data-id="${a.id}">Refuser</button>`:a.unlocked?'<span class="tag ok">Débloqué</span>':`<button class="button quiet" data-act="unlock" data-id="${a.id}">Débloquer</button>`}</td></tr>`).join("")}</table></div>`}
+ $("view").innerHTML=`<h2>Résultats</h2><label style="display:flex;gap:8px;align-items:center"><input id="flt" type="checkbox" style="width:auto" ${only?"checked":""} data-act="refresh"> Signalés uniquement</label><div class="wrap"><table><tr><th>Candidat</th><th>Examen</th><th>Date</th><th>État</th><th>Score</th><th>Sorties</th><th></th></tr>${data.filter(a=>!only||a.flagged_for_review).map(a=>`<tr><td>${esc(a.profiles?.display_name||"")}<br><small>${esc(a.profiles?.email||"")}</small></td><td>${esc(a.exams?.code)}</td><td>${new Date(a.started_at).toLocaleString("fr-FR")}</td><td>${a.status}</td><td>${a.score==null?"—":`${a.score}/${a.total_questions} ${tagOf(a)}`}</td><td>${a.suspicious_exit_count} ${a.flagged_for_review?'<span class="tag bad">à vérifier</span>':""}</td><td>${actions(a)}</td></tr>`).join("")}</table></div>`}
 async function showDetail(id){
  const{data:a,error}=await sb.from("exam_attempts").select("question_order,score,total_questions,passed,status,review_status,profiles!candidate_id(display_name,email)").eq("id",id).single();if(error)return say(error.message);
  const ord=a.question_order||[];
