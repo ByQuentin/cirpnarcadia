@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace recruteur | Police RP</title><link rel="stylesheet" href="styles.css">
+<style>.page-shell{width:min(1040px,calc(100% - 32px))}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}.tabs .on{background:var(--navy);color:#fff}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.row>*{flex:1;min-width:120px}
+.tag{padding:2px 8px;border-radius:20px;background:#edf1f6;font-size:12px}.bad{background:#fde7e9;color:#a9232f}.ok{background:#e3f6ec;color:#18794e}.wrap{overflow-x:auto}.q{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0}</style></head>
+<body>
+<header class="topbar"><div class="brand-mark">PN</div><div class="brand-copy"><strong>POLICE RP</strong><span>ESPACE RECRUTEUR</span></div></header>
+<main class="page-shell">
+<section class="panel" id="login"><h2>Connexion personnel</h2>
+<form id="lf"><label>E-mail</label><input id="em" type="email" required><label>Mot de passe</label><input id="pw" type="password" required>
+<button class="button primary">Se connecter</button><p class="form-message" id="auth-msg"></p></form></section>
+<div id="app" class="hidden">
+<div class="tabs"><button class="button quiet" data-tab="exams">Examens</button><button class="button quiet" data-tab="results">Résultats</button><button class="button quiet" data-tab="access">Accès</button><button class="button quiet" data-act="logout" style="margin-left:auto">Déconnexion</button></div>
+<p class="form-message" id="msg"></p>
+<section class="panel" id="view"></section></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script>
+<script>
+const cfg=window.POLICE_RP_CONFIG,FN_CREATE_USER="clever-action";
+const sb=supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey),$=i=>document.getElementById(i);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let me,exam,qs=[],cur="exams";
+const say=(t,ok)=>{$("msg").textContent=t||"";$("msg").style.color=ok?"#18794e":"var(--red)"};
+const val=id=>$(id).value.trim();
+function show(on){$("login").classList.toggle("hidden",on);$("app").classList.toggle("hidden",!on)}
+async function boot(){
+ const{data:{session}}=await sb.auth.getSession();if(!session)return show(false);
+ const{data:p}=await sb.from("profiles").select("id,role").eq("id",session.user.id).single();
+ if(!p||!["recruiter","admin"].includes(p.role)){await sb.auth.signOut();$("auth-msg").textContent="Accès réservé au personnel de recrutement.";return show(false)}
+ me=p;show(true);tab("exams")}
+$("lf").onsubmit=async e=>{e.preventDefault();const{error}=await sb.auth.signInWithPassword({email:val("em"),password:$("pw").value});
+ if(error)return $("auth-msg").textContent="Identifiants invalides.";$("auth-msg").textContent="";boot()};
+function tab(t){cur=t;exam=null;say("");document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));({exams:loadExams,results:loadResults,access:loadAccess})[t]()}
+function problems(list){const a=list.filter(q=>q.active),p=[];if(a.length<30)p.push(`30 questions actives minimum (actuellement ${a.length}).`);
+ a.forEach(q=>{const k=(Array.isArray(q.answer_keys)?q.answer_keys[0]:q.answer_keys)?.correct_option_id,o=q.question_options||[],n="« "+q.prompt.slice(0,45)+" » : ";
+ if(o.length<2)p.push(n+"moins de 2 réponses.");else if(!o.some(x=>x.id===k))p.push(n+"aucune bonne réponse valide.")});return p}
+async function loadExams(){const{data,error}=await sb.from("exams").select("id,code,title,duration_minutes,pass_percentage,is_active,questions(count)").order("created_at",{ascending:false});
+ if(error)return say(error.message);
+ $("view").innerHTML=`<h2>Examens</h2><div class="wrap"><table><tr><th>Code</th><th>Titre</th><th>Durée</th><th>Seuil</th><th>Questions</th><th>État</th><th></th></tr>${data.map(e=>`<tr><td>${esc(e.code)}</td><td>${esc(e.title)}</td><td>${e.duration_minutes} min</td><td>${e.pass_percentage}%</td><td>${e.questions[0]?.count||0}</td><td><span class="tag ${e.is_active?"ok":""}">${e.is_active?"Actif":"Inactif"}</span></td><td><button class="button quiet" data-act="open" data-id="${e.id}">Gérer</button></td></tr>`).join("")}</table></div>
+ <h3 style="margin-top:22px">Nouvel examen</h3><div class="row"><div><label>Code</label><input id="nc" placeholder="SEL-2026-002"></div><div><label>Titre</label><input id="nt"></div><div><label>Durée (min)</label><input id="nd" type="number" value="25"></div><div><label>Seuil (%)</label><input id="np" type="number" value="70"></div><button class="button primary" data-act="newexam">Créer</button></div>`}
+async function openExam(id){const{data:e}=await sb.from("exams").select("*").eq("id",id).single();exam=e;
+ const{data}=await sb.from("questions").select("id,prompt,active,question_options(id,option_text,display_order),answer_keys(correct_option_id)").eq("exam_id",id).order("created_at");qs=data||[];drawExam()}
+function drawExam(){const e=exam;$("view").innerHTML=`<button class="button quiet" data-tab="exams">← Examens</button><h2 style="margin-top:12px">${esc(e.code)} · ${esc(e.title)}</h2>
+ <div class="row"><div><label>Titre</label><input id="et" value="${esc(e.title)}"></div><div><label>Durée (min)</label><input id="ed" type="number" value="${e.duration_minutes}"></div><div><label>Seuil (%)</label><input id="ep" type="number" value="${e.pass_percentage}"></div><button class="button primary" data-act="saveexam">Enregistrer</button></div>
+ <div class="row" style="margin:14px 0"><button class="button quiet" data-act="check">Vérifier l'examen</button><button class="button ${e.is_active?"quiet":"primary"}" data-act="toggle">${e.is_active?"Désactiver":"Activer (après vérification)"}</button></div><div id="chk"></div>
+ <h3>Questions (${qs.length})</h3>${qs.map(q=>{const k=(Array.isArray(q.answer_keys)?q.answer_keys[0]:q.answer_keys)?.correct_option_id;return`<div class="q"><strong>${esc(q.prompt)}</strong> ${q.active?"":'<span class="tag bad">désactivée</span>'}<ul>${(q.question_options||[]).sort((a,b)=>a.display_order-b.display_order).map(o=>`<li>${esc(o.option_text)} ${o.id===k?'<span class="tag ok">bonne réponse</span>':""}</li>`).join("")}</ul><button class="button quiet" data-act="qactive" data-id="${q.id}">${q.active?"Désactiver":"Réactiver"}</button> <button class="button quiet" data-act="delq" data-id="${q.id}">Supprimer</button></div>`}).join("")}
+ <h3>Ajouter une question</h3><label>Énoncé</label><input id="qp">${[1,2,3,4].map(i=>`<div class="row"><div><label>Réponse ${i}${i>2?" (optionnelle)":""}</label><input class="qo"></div><label style="flex:0;min-width:130px"><input type="radio" name="qc" value="${i-1}" ${i==1?"checked":""} style="width:auto"> Bonne réponse</label></div>`).join("")}
+ <button class="button primary" style="margin-top:12px" data-act="addq">Ajouter la question</button>`}
+async function addQuestion(){const prompt=val("qp"),opts=[...document.querySelectorAll(".qo")].map((i,n)=>({t:i.value.trim(),n})).filter(o=>o.t),ci=+document.querySelector("[name=qc]:checked").value;
+ if(!prompt||opts.length<2)return say("Énoncé et 2 réponses minimum.");const good=opts.find(o=>o.n===ci);if(!good)return say("La bonne réponse cochée est vide.");
+ const{data:q,error}=await sb.from("questions").insert({exam_id:exam.id,prompt}).select("id").single();if(error)return say(error.message);
+ const{data:os,error:e2}=await sb.from("question_options").insert(opts.map((o,i)=>({question_id:q.id,option_text:o.t,display_order:i}))).select("id,option_text");
+ const gid=os?.find(o=>o.option_text===good.t)?.id;
+ const{error:e3}=gid?await sb.from("answer_keys").insert({question_id:q.id,correct_option_id:gid}):{error:e2||{message:"Erreur"}};
+ if(e2||e3){await sb.from("questions").delete().eq("id",q.id);return say((e2||e3).message)}
+ say("Question ajoutée.",1);openExam(exam.id)}
+async function loadResults(){const{data,error}=await sb.from("exam_attempts").select("id,status,score,total_questions,passed,suspicious_exit_count,flagged_for_review,unlocked,started_at,profiles(display_name,email),exams(code)").order("started_at",{ascending:false}).limit(200);
+ if(error)return say(error.message);const only=$("flt")?.checked;
+ $("view").innerHTML=`<h2>Résultats</h2><label style="display:flex;gap:8px;align-items:center"><input id="flt" type="checkbox" style="width:auto" ${only?"checked":""} data-act="refresh"> Signalés uniquement</label><div class="wrap"><table><tr><th>Candidat</th><th>Examen</th><th>Date</th><th>État</th><th>Score</th><th>Sorties</th><th></th></tr>${data.filter(a=>!only||a.flagged_for_review).map(a=>`<tr><td>${esc(a.profiles?.display_name||"")}<br><small>${esc(a.profiles?.email||"")}</small></td><td>${esc(a.exams?.code)}</td><td>${new Date(a.started_at).toLocaleString("fr-FR")}</td><td>${a.status}</td><td>${a.score==null?"—":`${a.score}/${a.total_questions} <span class="tag ${a.passed?"ok":"bad"}">${a.passed?"Réussi":"Échec"}</span>`}</td><td>${a.suspicious_exit_count} ${a.flagged_for_review?'<span class="tag bad">à vérifier</span>':""}</td><td>${a.status==="in_progress"?`<button class="button quiet" data-act="cancel" data-id="${a.id}">Annuler</button>`:a.unlocked?'<span class="tag ok">Débloqué</span>':`<button class="button quiet" data-act="unlock" data-id="${a.id}">Débloquer</button>`}</td></tr>`).join("")}</table></div>`}
+async function loadAccess(){const{data,error}=await sb.from("profiles").select("id,email,display_name,role").order("created_at",{ascending:false});if(error)return say(error.message);const adm=me.role==="admin";
+ $("view").innerHTML=`<h2>Accès</h2><div class="wrap"><table><tr><th>Nom</th><th>E-mail</th><th>Rôle</th></tr>${data.map(p=>`<tr><td>${esc(p.display_name)}</td><td>${esc(p.email)}</td><td>${adm&&p.id!==me.id?`<select data-role="${p.id}">${["candidate","recruiter","admin"].map(r=>`<option ${r===p.role?"selected":""}>${r}</option>`).join("")}</select>`:p.role}</td></tr>`).join("")}</table></div>
+ <h3 style="margin-top:22px">Créer un compte</h3><div class="row"><div><label>Nom / pseudo RP</label><input id="un"></div><div><label>E-mail</label><input id="ue" type="email"></div><div><label>Mot de passe (8+)</label><input id="up"></div><div><label>Rôle</label><select id="ur"><option value="candidate">candidate</option>${adm?'<option value="recruiter">recruiter</option><option value="admin">admin</option>':""}</select></div><button class="button primary" data-act="newuser">Créer</button></div>`}
+document.addEventListener("click",async ev=>{const b=ev.target.closest("[data-act],[data-tab]");if(!b)return;if(b.dataset.tab)return tab(b.dataset.tab);const a=b.dataset.act,id=b.dataset.id;
+ if(a==="logout"){await sb.auth.signOut();me=null;return show(false)}
+ if(a==="open")return openExam(id);if(a==="refresh")return loadResults();
+ if(a==="newexam"){const{error}=await sb.from("exams").insert({code:val("nc"),title:val("nt"),duration_minutes:+val("nd"),pass_percentage:+val("np"),created_by:me.id});return error?say(error.message):(say("Examen créé (inactif).",1),loadExams())}
+ if(a==="saveexam"){const{error}=await sb.from("exams").update({title:val("et"),duration_minutes:+val("ed"),pass_percentage:+val("ep")}).eq("id",exam.id);return error?say(error.message):(say("Enregistré.",1),openExam(exam.id))}
+ if(a==="check"){const p=problems(qs);$("chk").innerHTML=p.length?`<div class="notice"><strong>Problèmes détectés</strong><ul>${p.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:'<div class="notice" style="background:#e3f6ec"><strong>Examen valide : prêt à être activé.</strong></div>';return}
+ if(a==="toggle"){if(!exam.is_active){const p=problems(qs);if(p.length)return say("Activation refusée : cliquez sur « Vérifier l'examen ».")}
+  const{error}=await sb.from("exams").update({is_active:!exam.is_active}).eq("id",exam.id);return error?say(error.message):(say("État mis à jour.",1),openExam(exam.id))}
+ if(a==="addq")return addQuestion();
+ if(a==="qactive"){const q=qs.find(x=>x.id===id);await sb.from("questions").update({active:!q.active}).eq("id",id);return openExam(exam.id)}
+ if(a==="delq"){if(!confirm("Supprimer cette question ?"))return;const{error}=await sb.from("questions").delete().eq("id",id);return error?say(error.message):openExam(exam.id)}
+ if(a==="unlock"){await sb.from("exam_attempts").update({unlocked:true}).eq("id",id);return loadResults()}
+ if(a==="cancel"){if(!confirm("Annuler cette tentative en cours ?"))return;await sb.from("exam_attempts").update({status:"cancelled"}).eq("id",id);return loadResults()}
+ if(a==="newuser"){const{data:{session}}=await sb.auth.getSession();
+  const r=await fetch(`${cfg.functionsBaseUrl}/${FN_CREATE_USER}`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`,apikey:cfg.supabaseAnonKey},body:JSON.stringify({email:val("ue"),password:val("up"),displayName:val("un"),role:$("ur").value})});
+  const d=await r.json().catch(()=>({}));return r.ok?(say("Compte créé.",1),loadAccess()):say(d.error||"Échec.")}});
+document.addEventListener("change",async ev=>{const id=ev.target.dataset?.role;if(!id)return;const{error}=await sb.from("profiles").update({role:ev.target.value}).eq("id",id);error?say(error.message):say("Rôle mis à jour.",1)});
+boot();
+</script></body></html>
