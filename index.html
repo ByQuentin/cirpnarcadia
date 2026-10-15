@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Portail de sélection — Police RP">
+  <title>Centre de sélection | Police RP</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">PN</div>
+    <div class="brand-copy">
+      <strong>POLICE RP</strong>
+      <span>CENTRE DE SÉLECTION</span>
+    </div>
+    <span class="environment" id="environment-label">PORTAIL CANDIDAT</span>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro">
+      <p class="eyebrow">RECRUTEMENT · ÉVALUATION</p>
+      <h1>Examen de sélection</h1>
+      <p class="muted">Connectez-vous pour accéder à votre session d'examen. Les règles et procédures évaluées sont celles de votre serveur RP.</p>
+    </section>
+
+    <section class="panel" id="auth-panel">
+      <h2>Connexion</h2>
+      <p class="muted small">Utilisez le compte qui vous a été communiqué par l'équipe de recrutement.</p>
+      <form id="login-form">
+        <label for="email">Adresse e-mail</label>
+        <input id="email" name="email" type="email" autocomplete="username" required>
+        <label for="password">Mot de passe</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button class="button primary" type="submit">Se connecter</button>
+        <p class="form-message" id="auth-message" role="status"></p>
+      </form>
+    </section>
+
+    <section class="panel hidden" id="candidate-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">ESPACE CANDIDAT</p>
+          <h2 id="candidate-heading">Votre examen</h2>
+        </div>
+        <button class="button quiet" id="logout-button" type="button">Déconnexion</button>
+      </div>
+      <div id="candidate-home">
+        <p class="muted">Aucun examen n'est lancé automatiquement. Lorsque votre recruteur vous aura communiqué une session, vous pourrez la démarrer ici.</p>
+        <label for="exam-code">Code de session</label>
+        <input id="exam-code" autocomplete="off" placeholder="Ex. SEL-2026-001">
+        <button class="button primary" id="start-button" type="button">Démarrer l'examen</button>
+        <p class="form-message" id="start-message" role="status"></p>
+      </div>
+      <div id="exam-view" class="hidden">
+        <div class="exam-meta">
+          <div><span class="muted small">TEMPS RESTANT</span><strong id="timer">--:--</strong></div>
+          <div><span class="muted small">PROGRESSION</span><strong id="progress">0 / 30</strong></div>
+        </div>
+        <div class="progress-track"><div id="progress-bar"></div></div>
+        <div id="question-container"></div>
+        <div class="exam-actions">
+          <button class="button quiet" id="previous-button" type="button">Précédente</button>
+          <button class="button primary" id="next-button" type="button">Suivante</button>
+        </div>
+        <p class="form-message" id="exam-message" role="status"></p>
+      </div>
+      <div id="exam-finished" class="hidden">
+        <h3>Examen transmis</h3>
+        <p class="muted">Votre session est terminée. Le résultat sera consultable par l'équipe de recrutement selon les règles du serveur.</p>
+        <p id="finish-summary"></p>
+      </div>
+    </section>
+
+    <section class="notice">
+      <strong>Règles de session</strong>
+      <p>Le chronomètre démarre avec la session et ne s'arrête pas si vous quittez la page. Les changements de visibilité sont consignés. Trois sorties ou plus déclenchent un signalement à vérifier par un recruteur ; ce signalement ne prouve pas à lui seul une triche.</p>
+    </section>
+    <footer>Outil communautaire destiné au jeu de rôle · Ne constitue pas un service officiel de la Police nationale.</footer>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
